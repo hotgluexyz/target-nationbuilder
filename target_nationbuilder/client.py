@@ -93,5 +93,6 @@ class NationBuilderSink(HotglueSink):
             id = response.json().get(self.entity, {}).get("id")
         # Updating records doesn't seem to work
         if response.status_code == 200 and method == "PUT":
+            state_dict["success"] = True
             state_dict["is_updated"] = True
         return id, response.ok, state_dict
