@@ -19,6 +19,8 @@ class ContactsSink(NationBuilderSink):
             "email_opt_in": True,  # disable if requested
             "profile_image_url_ssl": record.get("photo_url"),
             "note": record.get("description"),
+            "email_opt_in": record.get("subscribe_status") == "subscribed",
+            "prefix": record.get("salutation"),
         }
 
         # map addresses
@@ -58,11 +60,12 @@ class ContactsSink(NationBuilderSink):
             for phone in record["phone_numbers"]:
                 if phone.get("type") == "primary":
                     payload["phone"] = phone.get("number")
+                if phone.get("type") == "mobile":
+                    payload["mobile"] = phone.get("number")
                 if phone.get("type") == "work":
                     payload["work_phone_number"] = phone.get("number")
 
         if "id" in record:
-            self.id = record["id"]
             payload["id"] = record["id"]
 
         # All of the custom fields in nationbuilder are stored at base level

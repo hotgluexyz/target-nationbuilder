@@ -7,6 +7,7 @@ import json
 import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
+from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 LOGGER = singer.get_logger()
@@ -26,7 +27,6 @@ class NationBuilderSink(HotglueSink):
         self.__auth = NationBuilderAuth(dict(self.config))
 
     """Dynamics target sink class."""
-    id = None
     country_codes = None
 
     @property
@@ -47,18 +47,44 @@ class NationBuilderSink(HotglueSink):
     def get_country_code(self, country_name):
         return self.get_country_codes().get(country_name)
 
+    def validate_response(self, response: requests.Response) -> None:
+        """Validate HTTP response."""
+        if response.status_code in [409]:
+            msg = response.reason
+            raise FatalAPIError(msg)
+        elif response.status_code in [429] or 500 <= response.status_code < 600:
+            msg = self.response_error_message(response)
+            raise RetriableAPIError(msg, response)
+        elif 400 <= response.status_code < 500:
+            try:
+                msg = response.text
+            except:
+                msg = self.response_error_message(response)
+            raise FatalAPIError(msg)
+
     def upsert_record(self, record: dict, context: dict):
         method = "POST"
         state_dict = dict()
-        id = None
+        payload = record.get("person") or dict()
+        id = payload.get("id")
         self.params["access_token"] = self.get_access_token()
         endpoint = self.endpoint
-        if self.id:
+        if not id:
+            # check if there's a match with the same email
+            resp = self.request_api(
+                "GET",
+                request_data=record,
+                endpoint=endpoint + f"/match?email={payload.get('email')}",
+            )
+            match = resp.json()
+            if match.get("person"):
+                id = match["person"]["id"]
+
+        if id:
             method = "PUT"
-            endpoint = f"{endpoint}/{self.id}"
+            endpoint = f"{endpoint}/{id}"
 
         response = self.request_api(method, request_data=record, endpoint=endpoint)
-        self.validate_response(response)
         if response.status_code in [200, 201]:
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
