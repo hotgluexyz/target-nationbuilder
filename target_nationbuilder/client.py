@@ -39,11 +39,6 @@ class NationBuilderSink(HotglueSink):
                 self.country_codes = json.load(file)
         return self.country_codes
 
-    def get_auth(self):
-        r = requests.Session()
-        auth = self.__auth(r)
-        return auth
-
     def get_access_token(self):
         r = requests.Session()
         auth = self.__auth(r)
@@ -51,10 +46,6 @@ class NationBuilderSink(HotglueSink):
 
     def get_country_code(self, country_name):
         return self.get_country_codes().get(country_name)
-
-    def log_request_response(self, record, response):
-        self.logger.info(f"Sending payload for stream {self.name}: {record}")
-        self.logger.info(f"Response: {response.text}")
 
     def upsert_record(self, record: dict, context: dict):
         method = "POST"
@@ -68,7 +59,6 @@ class NationBuilderSink(HotglueSink):
 
         response = self.request_api(method, request_data=record, endpoint=endpoint)
         self.validate_response(response)
-        self.log_request_response(record, response)
         if response.status_code in [200, 201]:
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
