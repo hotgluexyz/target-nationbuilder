@@ -70,15 +70,18 @@ class NationBuilderSink(HotglueSink):
         self.params["access_token"] = self.get_access_token()
         endpoint = self.endpoint
         if not id:
-            # check if there's a match with the same email
-            resp = self.request_api(
-                "GET",
-                request_data=record,
-                endpoint=endpoint + f"/match?email={payload.get('email')}",
-            )
-            match = resp.json()
-            if match.get("person"):
-                id = match["person"]["id"]
+            try:
+                # check if there's a match with the same email
+                resp = self.request_api(
+                    "GET",
+                    request_data=record,
+                    endpoint=endpoint + f"/match?email={payload.get('email')}",
+                )
+                match = resp.json()
+                if match.get("person"):
+                    id = match["person"]["id"]
+            except:
+                pass
 
         if id:
             method = "PUT"
