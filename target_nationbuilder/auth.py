@@ -2,12 +2,13 @@ import requests
 import json
 from datetime import datetime, timedelta
 
+
 class NationBuilderAuth(requests.auth.AuthBase):
     def __init__(self, config):
         self.__config = config
         self.__client_id = config["client_id"]
         self.__client_secret = config["client_secret"]
-        self.__redirect_uri = config.get("redirect_uri","https://hotglue.xyz/callback")
+        self.__redirect_uri = config.get("redirect_uri", "https://hotglue.xyz/callback")
         self.__refresh_token = config["refresh_token"]
 
         self.__session = requests.Session()
