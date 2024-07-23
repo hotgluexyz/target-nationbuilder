@@ -18,7 +18,7 @@ class NationBuilderAuth(requests.auth.AuthBase):
     def ensure_access_token(self):
         if self.__access_token is None or self.__expires_at <= datetime.utcnow():
             response = self.__session.post(
-                "https://hotglue.nationbuilder.com/oauth/token",
+                f"https://{self.__config.get('subdomain')}.nationbuilder.com/oauth/token",
                 data={
                     "client_id": self.__client_id,
                     "client_secret": self.__client_secret,
