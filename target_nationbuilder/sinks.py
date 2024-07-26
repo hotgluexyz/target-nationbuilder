@@ -21,6 +21,7 @@ class ContactsSink(NationBuilderSink):
             "note": record.get("description"),
             "email_opt_in": record.get("subscribe_status") == "subscribed",
             "prefix": record.get("salutation"),
+            "tags": record.get("tags")
         }
 
         # map addresses
