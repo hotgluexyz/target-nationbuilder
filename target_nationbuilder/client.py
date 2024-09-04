@@ -109,13 +109,15 @@ class NationBuilderSink(HotglueSink):
             contact_lists = self.get_contact_lists()
             for list_register in record["lists"]:
                 should_add_user = True
+                people_id = record["id"]
                 if list_register not in contact_lists:
-                    contact_list_id = self.create_contact_list(list_register, record["id"])
+                    contact_list_id = self.create_contact_list(list_register, people_id)
                 else:
                     contact_list_id = contact_lists[list_register]["id"]
-                    should_add_user = self.check_user_not_on_contact_list(contact_list_id)
+                    should_add_user = self.check_user_not_on_contact_list(contact_list_id, people_id)
                 if should_add_user:
-                    self.include_person_into_contact_list(contact_list_id,int(record["id"]))
+                    continue
+                    self.include_person_into_contact_list(contact_list_id, people_id)
 
     def get_contact_lists(self) -> dict[str,list]:
         method = "GET"
@@ -140,14 +142,13 @@ class NationBuilderSink(HotglueSink):
 
         return contact_lists
     
-    def create_contact_list(self, contact_list_name: str, author_id: int) -> int:
+    def create_contact_list(self, contact_list_name: str, author_id: str) -> int:
         try:
             def transform_contact_list_into_slug(contact_list_name: str) -> str:
                 unique_element = str(time.time())
                 combined_str = contact_list_name + unique_element
                 hash_object = hashlib.sha256(combined_str.encode('utf-8'))
                 return hash_object.hexdigest()
-
 
             method = "POST"
             self.params["access_token"] = self.get_access_token()
@@ -170,3 +171,18 @@ class NationBuilderSink(HotglueSink):
                 return response.json().get("list_resource", {}).get("id")
         except Exception as e:
             raise UnableToCreateContactsListError(f"Unable to create contacts list {contact_list_name} with author if {author_id}")
+        
+    def check_user_not_on_contact_list(self, contact_list_id: int, people_id: int) -> bool:
+        method = "GET"
+        self.params["access_token"] = self.get_access_token()
+        endpoint = f"lists/{contact_list_id}/people"
+        resp = self.request_api(
+            method,
+            endpoint=endpoint,
+        )
+        match = resp.json()
+        results = match["results"]
+        for result in results:
+            if people_id == result["id"]:
+                return False
+        return True
