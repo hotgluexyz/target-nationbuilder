@@ -8,7 +8,7 @@ import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
 from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
-from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError
+from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError, UnableToCheckUserNotOnContactListError, UnableToGetContactListsError
 import hashlib
 import time
 
@@ -82,14 +82,14 @@ class NationBuilderSink(HotglueSink):
                 )
                 match = resp.json()
                 if match.get("person"):
-                    id = match["person"]["id"]
+                    id = match["person"].get("id")
             except:
                 pass
 
         if id:
             method = "PUT"
             endpoint = f"{endpoint}/{id}"
-        lists = record["person"].pop("lists") if "lists" in record["person"] else None
+        lists = record["person"].pop("lists") if "person" in record and "lists" in record["person"] else None
         response = self.request_api(method, request_data=record, endpoint=endpoint)
         if response.status_code in [200, 201]:
             state_dict["success"] = True
@@ -105,41 +105,45 @@ class NationBuilderSink(HotglueSink):
         return id, response.ok, state_dict
 
     def resolve_contact_lists(self, record: dict):
-        if "lists" in record and isinstance(record["lists"], list) and record["lists"]:
-            contact_lists = self.get_contact_lists()
-            for list_register in record["lists"]:
-                should_add_user = True
-                people_id = record["id"]
-                if list_register not in contact_lists:
-                    contact_list_id = self.create_contact_list(list_register, people_id)
-                else:
-                    contact_list_id = contact_lists[list_register]["id"]
-                    should_add_user = self.check_user_not_on_contact_list(contact_list_id, people_id)
-                if should_add_user:
-                    self.include_person_into_contact_list(contact_list_id, people_id)
+        if "lists" not in record or not isinstance(record["lists"], list) or not record["lists"] or "id" not in record or not record["id"]:
+            return
+        contact_lists = self.get_contact_lists()
+        for list_register in record["lists"]:
+            should_add_user = True
+            people_id = record["id"]
+            if list_register not in contact_lists:
+                contact_list_id = self.create_contact_list(list_register, people_id)
+            else:
+                contact_list_id = contact_lists[list_register]["id"]
+                should_add_user = self.check_user_not_on_contact_list(contact_list_id, people_id)
+            if should_add_user:
+                self.include_person_into_contact_list(contact_list_id, people_id)
 
     def get_contact_lists(self) -> dict[str,list]:
-        method = "GET"
-        self.params["access_token"] = self.get_access_token()
-        endpoint = "lists"
-        next_page = ""
-        contact_lists = {}
-        while next_page != None:
-            resp = self.request_api(
-                method,
-                endpoint=endpoint + next_page,
-            )
-            match = resp.json()
-            results = match["results"]
-            for result in results:
-                # Reference: https://linear.app/hotglue/issue/HGI-6388/[newmode]-create-list-if-not-exist-for-target-nationbuilder#comment-93209fd3
-                if result["name"] not in contact_lists:
-                    contact_lists[result["name"]] = result
-            next_page = match.get("next")
-            if next_page:
-                next_page = next_page.split(endpoint)[1]
+        try:
+            method = "GET"
+            self.params["access_token"] = self.get_access_token()
+            endpoint = "lists"
+            next_page = ""
+            contact_lists = {}
+            while next_page != None:
+                resp = self.request_api(
+                    method,
+                    endpoint=endpoint + next_page,
+                )
+                match = resp.json()
+                results = match["results"]
+                for result in results:
+                    # Reference: https://linear.app/hotglue/issue/HGI-6388/[newmode]-create-list-if-not-exist-for-target-nationbuilder#comment-93209fd3
+                    if result["name"] not in contact_lists:
+                        contact_lists[result["name"]] = result
+                next_page = match.get("next")
+                if next_page:
+                    next_page = next_page.split(endpoint)[1]
 
-        return contact_lists
+            return contact_lists
+        except Exception as e:
+            raise UnableToGetContactListsError(f"Unable to get contact lists from the nation. {e}")
     
     def create_contact_list(self, contact_list_name: str, author_id: str) -> int:
         try:
@@ -172,19 +176,23 @@ class NationBuilderSink(HotglueSink):
             raise UnableToCreateContactsListError(f"Unable to create contacts list {contact_list_name} with author if {author_id}")
         
     def check_user_not_on_contact_list(self, contact_list_id: int, people_id: int) -> bool:
-        method = "GET"
-        self.params["access_token"] = self.get_access_token()
-        endpoint = f"lists/{contact_list_id}/people"
-        resp = self.request_api(
-            method,
-            endpoint=endpoint,
-        )
-        match = resp.json()
-        results = match["results"]
-        for result in results:
-            if people_id == result["id"]:
-                return False
-        return True
+        try:
+            method = "GET"
+            self.params["access_token"] = self.get_access_token()
+            endpoint = f"lists/{contact_list_id}/people"
+            resp = self.request_api(
+                method,
+                endpoint=endpoint,
+            )
+            match = resp.json()
+            results = match["results"]
+            for result in results:
+                if people_id == result["id"]:
+                    return False
+            return True
+        except Exception as e:
+            raise UnableToCheckUserNotOnContactListError(f"Unable to check if user {people_id} is on contact list {contact_list_id}. {e}")
+
     
     def include_person_into_contact_list(self, contact_list_id:int, people_id:int):
         try:
@@ -200,4 +208,4 @@ class NationBuilderSink(HotglueSink):
                 endpoint=endpoint,
             )
         except Exception as e:
-            raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}")
+            raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}. {e}")
