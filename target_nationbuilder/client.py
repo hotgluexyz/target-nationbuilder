@@ -8,6 +8,9 @@ import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
 from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+from target_nationbuilder.exceptions import UnableToCreateContactsListError
+import hashlib
+import time
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 LOGGER = singer.get_logger()
@@ -107,12 +110,12 @@ class NationBuilderSink(HotglueSink):
             for list_register in record["lists"]:
                 should_add_user = True
                 if list_register not in contact_lists:
-                    contact_list_id = self.create_contact_list(list_register)
+                    contact_list_id = self.create_contact_list(list_register, record["id"])
                 else:
                     contact_list_id = contact_lists[list_register]["id"]
                     should_add_user = self.check_user_not_on_contact_list(contact_list_id)
                 if should_add_user:
-                    self.include_person_into_contact_list(contact_list_id,record["id"])
+                    self.include_person_into_contact_list(contact_list_id,int(record["id"]))
 
     def get_contact_lists(self) -> dict[str,list]:
         method = "GET"
@@ -136,3 +139,34 @@ class NationBuilderSink(HotglueSink):
                 next_page = next_page.split(endpoint)[1]
 
         return contact_lists
+    
+    def create_contact_list(self, contact_list_name: str, author_id: int) -> int:
+        try:
+            def transform_contact_list_into_slug(contact_list_name: str) -> str:
+                unique_element = str(time.time())
+                combined_str = contact_list_name + unique_element
+                hash_object = hashlib.sha256(combined_str.encode('utf-8'))
+                return hash_object.hexdigest()
+
+
+            method = "POST"
+            self.params["access_token"] = self.get_access_token()
+            state_dict = dict()
+            endpoint = "lists"
+            coantact_list = {
+                "list": {
+                    "name": contact_list_name,
+                    "slug": transform_contact_list_into_slug(contact_list_name),
+                    "author_id": author_id
+                }
+            }
+            response = self.request_api(
+                method,
+                request_data=coantact_list,
+                endpoint=endpoint,
+            )
+            if response.status_code in [200, 201]:
+                state_dict["success"] = True
+                return response.json().get("list_resource", {}).get("id")
+        except Exception as e:
+            raise UnableToCreateContactsListError(f"Unable to create contacts list {contact_list_name} with author if {author_id}")
