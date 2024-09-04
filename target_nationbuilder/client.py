@@ -8,7 +8,7 @@ import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
 from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
-from target_nationbuilder.exceptions import UnableToCreateContactsListError
+from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError
 import hashlib
 import time
 
@@ -116,7 +116,6 @@ class NationBuilderSink(HotglueSink):
                     contact_list_id = contact_lists[list_register]["id"]
                     should_add_user = self.check_user_not_on_contact_list(contact_list_id, people_id)
                 if should_add_user:
-                    continue
                     self.include_person_into_contact_list(contact_list_id, people_id)
 
     def get_contact_lists(self) -> dict[str,list]:
@@ -186,3 +185,19 @@ class NationBuilderSink(HotglueSink):
             if people_id == result["id"]:
                 return False
         return True
+    
+    def include_person_into_contact_list(self, contact_list_id:int, people_id:int):
+        try:
+            method = "POST"
+            self.params["access_token"] = self.get_access_token()
+            endpoint = f"lists/{contact_list_id}/people"
+            people_ids = {
+                "people_ids": [people_id]
+            }
+            self.request_api(
+                method,
+                request_data=people_ids,
+                endpoint=endpoint,
+            )
+        except Exception as e:
+            raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}")
