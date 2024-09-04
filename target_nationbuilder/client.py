@@ -11,6 +11,9 @@ from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError, UnableToCheckUserNotOnContactListError, UnableToGetContactListsError
 import hashlib
 import time
+import unidecode
+import re
+
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 LOGGER = singer.get_logger()
@@ -112,7 +115,7 @@ class NationBuilderSink(HotglueSink):
             should_add_user = True
             people_id = record["id"]
             if list_register not in contact_lists:
-                contact_list_id = self.create_contact_list(list_register, people_id)
+                contact_list_id = self.create_contact_list(list_register, people_id, contact_lists)
             else:
                 contact_list_id = contact_lists[list_register]["id"]
                 should_add_user = self.check_user_not_on_contact_list(contact_list_id, people_id)
@@ -145,13 +148,21 @@ class NationBuilderSink(HotglueSink):
         except Exception as e:
             raise UnableToGetContactListsError(f"Unable to get contact lists from the nation. {e}")
     
-    def create_contact_list(self, contact_list_name: str, author_id: str) -> int:
+    def create_contact_list(self, contact_list_name: str, author_id: str, contact_lists: dict) -> int:
         try:
-            def transform_contact_list_into_slug(contact_list_name: str) -> str:
+            def transform_contact_list_into_slug(contact_list_name: str, contact_lists:dict) -> str:
+                slugs = [contact_list["slug"] for contact_list in contact_lists.values() if "slug" in contact_list]
+                contact_list_name = contact_list_name.lower()
+                contact_list_name = unidecode.unidecode(contact_list_name)
+                contact_list_name = re.sub(r'[^a-z0-9]+', '-', contact_list_name)
+                contact_list_name = contact_list_name.strip('-')
+                contact_list_name = re.sub(r'-+', '-', contact_list_name)
+                if contact_list_name not in slugs:
+                    return contact_list_name
                 unique_element = str(time.time())
                 combined_str = contact_list_name + unique_element
                 hash_object = hashlib.sha256(combined_str.encode('utf-8'))
-                return hash_object.hexdigest()
+                return contact_list_name + hash_object.hexdigest()
 
             method = "POST"
             self.params["access_token"] = self.get_access_token()
@@ -160,7 +171,7 @@ class NationBuilderSink(HotglueSink):
             coantact_list = {
                 "list": {
                     "name": contact_list_name,
-                    "slug": transform_contact_list_into_slug(contact_list_name),
+                    "slug": transform_contact_list_into_slug(contact_list_name, contact_lists),
                     "author_id": author_id
                 }
             }
