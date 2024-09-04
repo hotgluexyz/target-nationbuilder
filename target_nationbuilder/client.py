@@ -86,13 +86,53 @@ class NationBuilderSink(HotglueSink):
         if id:
             method = "PUT"
             endpoint = f"{endpoint}/{id}"
-
+        lists = record["person"].pop("lists") if "lists" in record["person"] else None
         response = self.request_api(method, request_data=record, endpoint=endpoint)
         if response.status_code in [200, 201]:
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
+            record["id"] = id
+            if lists:
+                record["lists"] = lists
+            self.resolve_contact_lists(record)
         # Updating records doesn't seem to work
         if response.status_code == 200 and method == "PUT":
             state_dict["success"] = True
             state_dict["is_updated"] = True
         return id, response.ok, state_dict
+
+    def resolve_contact_lists(self, record: dict):
+        if "lists" in record and isinstance(record["lists"], list) and record["lists"]:
+            contact_lists = self.get_contact_lists()
+            for list_register in record["lists"]:
+                should_add_user = True
+                if list_register not in contact_lists:
+                    contact_list_id = self.create_contact_list(list_register)
+                else:
+                    contact_list_id = contact_lists[list_register]["id"]
+                    should_add_user = self.check_user_not_on_contact_list(contact_list_id)
+                if should_add_user:
+                    self.include_person_into_contact_list(contact_list_id,record["id"])
+
+    def get_contact_lists(self) -> dict[str,list]:
+        method = "GET"
+        self.params["access_token"] = self.get_access_token()
+        endpoint = "lists"
+        next_page = ""
+        contact_lists = {}
+        while next_page != None:
+            resp = self.request_api(
+                method,
+                endpoint=endpoint + next_page,
+            )
+            match = resp.json()
+            results = match["results"]
+            for result in results:
+                # Reference: https://linear.app/hotglue/issue/HGI-6388/[newmode]-create-list-if-not-exist-for-target-nationbuilder#comment-93209fd3
+                if result["name"] not in contact_lists:
+                    contact_lists[result["name"]] = result
+            next_page = match.get("next")
+            if next_page:
+                next_page = next_page.split(endpoint)[1]
+
+        return contact_lists

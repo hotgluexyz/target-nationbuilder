@@ -69,6 +69,9 @@ class ContactsSink(NationBuilderSink):
         if "id" in record:
             payload["id"] = record["id"]
 
+        if "lists" in record:
+            payload["lists"] = record["lists"]
+
         # All of the custom fields in nationbuilder are stored at base level
         if "custom_fields" in record and isinstance(record["custom_fields"], list):
             for custom_field in record["custom_fields"]:
