@@ -5,6 +5,7 @@ from target_hotglue.target import TargetHotglue
 
 from target_nationbuilder.sinks import (
     ContactsSink,
+    FallbackSink,
 )
 
 
@@ -13,6 +14,7 @@ class TargetNationbuilder(TargetHotglue):
 
     SINK_TYPES = [
         ContactsSink,
+        FallbackSink,
     ]
     name = "target-nationbuilder"
 

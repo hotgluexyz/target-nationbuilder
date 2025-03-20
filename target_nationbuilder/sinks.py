@@ -1,6 +1,51 @@
 """Nationbuilder target sink class, which handles writing streams."""
 
 from target_nationbuilder.client import NationBuilderSink
+import requests
+
+
+class FallbackSink(NationBuilderSink):
+    """Fallback sink for non-idempotent endpoints that passes through the record directly."""
+
+    @property
+    def endpoint(self):
+        return f"/{self.stream_name}"
+    
+    @property
+    def name(self):
+        return self.stream_name
+
+    def preprocess_record(self, record: dict, context: dict) -> dict:
+        """Process the record."""
+        if record.get("properties"):
+            record = record["properties"]
+        return {"properties": record}
+
+    def upsert_record(self, record: dict, context: dict):
+        """Send the record directly to the endpoint specified by the stream name."""
+        state_updates = dict()
+        method = "POST"
+        endpoint = self.endpoint
+        pk = self.key_properties[0] if self.key_properties else "id"
+        
+        if record:
+            id = record['properties'].pop(pk, None) if record.get("properties") else record.pop(pk, None)
+            if id:
+                method = "PATCH"
+                endpoint = f"{endpoint}/{id}"
+            
+            url = f"{self.base_url}{endpoint}"
+            headers = {
+                "Authorization": f"Bearer {self.get_access_token()}",
+                "Content-Type": "application/json",
+            }
+            
+            response = requests.request(method, url, headers=headers, json=record)
+            self.validate_response(response)
+            
+            response_data = response.json()
+            id = response_data.get(pk)
+            return id, True, state_updates
 
 
 class ContactsSink(NationBuilderSink):
