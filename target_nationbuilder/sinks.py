@@ -17,7 +17,7 @@ class FallbackSink(NationBuilderSink):
         """Process the record."""
         if record.get("properties"):
             record = record["properties"]
-        return {"properties": record}
+        return record
 
     def upsert_record(self, record: dict, context: dict):
         """Send the record directly to the endpoint specified by the stream name."""
@@ -27,7 +27,7 @@ class FallbackSink(NationBuilderSink):
         pk = self.key_properties[0] if self.key_properties else "id"
         
         if record:
-            id = record['properties'].pop(pk, None) if record.get("properties") else record.pop(pk, None)
+            id = record.pop(pk, None)
             if id:
                 method = "PATCH"
                 endpoint = f"{endpoint}/{id}"
