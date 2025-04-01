@@ -30,7 +30,7 @@ class NationBuilderSink(HotglueSink):
         super().__init__(target, stream_name, schema, key_properties)
         # Save config for refresh_token saving
         self.config_file = target.config
-        self.__auth = NationBuilderAuth(dict(self.config))
+        self.__auth = NationBuilderAuth(self._target)
 
     """Dynamics target sink class."""
     country_codes = None
