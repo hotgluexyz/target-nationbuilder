@@ -32,7 +32,7 @@ class NationBuilderAuth(requests.auth.AuthBase):
             self._target._config["expires_in"] = data["expires_in"]
             self._target._config["access_token"] = data["access_token"]
 
-            with open("config.json", "w") as outfile:
+            with open(self._target._config_file_path, "w") as outfile:
                 json.dump(self._target._config, outfile, indent=4)
 
             self.__expires_at = datetime.utcnow() + timedelta(
