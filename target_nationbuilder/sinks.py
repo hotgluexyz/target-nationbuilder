@@ -7,13 +7,11 @@ import requests
 class FallbackSink(NationBuilderSink):
     """Fallback sink for non-idempotent endpoints that passes through the record directly."""
 
+    name = "fallback_sink"
+
     @property
     def endpoint(self):
         return f"/{self.stream_name}"
-    
-    @property
-    def name(self):
-        return self.stream_name
 
     def preprocess_record(self, record: dict, context: dict) -> dict:
         """Process the record."""
