@@ -1,10 +1,13 @@
 """Nationbuilder target class."""
 
 from singer_sdk import typing as th
+from singer_sdk.sinks import Sink
 from target_hotglue.target import TargetHotglue
+from typing import Type
 
 from target_nationbuilder.sinks import (
     ContactsSink,
+    FallbackSink,
 )
 
 
@@ -13,6 +16,7 @@ class TargetNationbuilder(TargetHotglue):
 
     SINK_TYPES = [
         ContactsSink,
+        FallbackSink,
     ]
     name = "target-nationbuilder"
 
@@ -37,6 +41,9 @@ class TargetNationbuilder(TargetHotglue):
         th.Property("subdomain", th.StringType, required=True),
     ).to_dict()
 
+    def get_sink_class(self, stream_name: str) -> Type[Sink]:
+        sink = super().get_sink_class(stream_name)
+        return sink if sink else FallbackSink
 
 if __name__ == "__main__":
     TargetNationbuilder.cli()
