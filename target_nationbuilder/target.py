@@ -39,6 +39,7 @@ class TargetNationbuilder(TargetHotglue):
         th.Property("client_secret", th.StringType, required=True),
         th.Property("refresh_token", th.StringType, required=True),
         th.Property("subdomain", th.StringType, required=True),
+        th.Property("only_upsert_empty_fields", th.BooleanType, required=False),
     ).to_dict()
 
     def get_sink_class(self, stream_name: str) -> Type[Sink]:

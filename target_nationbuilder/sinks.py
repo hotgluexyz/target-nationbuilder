@@ -53,6 +53,10 @@ class ContactsSink(NationBuilderSink):
     endpoint = "people"
     entity = "person"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
+
     def map_fields(self, record: dict) -> dict:
         payload = {
             "full_name": record.get("name"),
@@ -125,6 +129,68 @@ class ContactsSink(NationBuilderSink):
     def preprocess_record(self, record: dict, context: dict) -> dict:
         payload = self.map_fields(record)
         return payload
+
+    def upsert_record(self, record: dict, context: dict):
+        """Upsert a record to NationBuilder."""
+        method = "POST"
+        state_dict = dict()
+        payload = record.get("person") or dict()
+        id = payload.get("id")
+        self.params["access_token"] = self.get_access_token()
+        endpoint = self.endpoint
+
+        if not id:
+            try:
+                resp = self.request_api(
+                    "GET",
+                    request_data=record,
+                    endpoint=endpoint + f"/match?email={payload.get('email')}",
+                )
+                match = resp.json()
+                if match.get("person"):
+                    id = match["person"].get("id")
+            except:
+                pass
+
+        if id:
+            method = "PUT"
+            endpoint = f"{endpoint}/{id}"
+
+            if self.only_upsert_empty_fields:
+                url = f"{self.base_url}{endpoint}"
+                headers = {
+                    "Authorization": f"Bearer {self.get_access_token()}",
+                    "Content-Type": "application/json",
+                }
+                response = requests.get(url, headers=headers)
+                self.validate_response(response)
+                existing_record = response.json()
+                
+                # Only update fields that are empty in the existing record
+                if "person" in record and "person" in existing_record:
+                    for key, value in record["person"].items():
+                        if not existing_record["person"].get(key):
+                            existing_record["person"][key] = value
+                    record = existing_record
+
+        # Handle lists separately
+        lists = record["person"].pop("lists") if "person" in record and "lists" in record["person"] else None
+
+        response = self.request_api(method, request_data=record, endpoint=endpoint)
+
+        if response.status_code in [200, 201]:
+            state_dict["success"] = True
+            id = response.json().get(self.entity, {}).get("id")
+            record["id"] = id
+            if lists:
+                record["lists"] = lists
+            self.resolve_contact_lists(record)
+
+        if response.status_code == 200 and method == "PUT":
+            state_dict["success"] = True
+            state_dict["is_updated"] = True
+
+        return id, response.ok, state_dict
 
 
 class CustomersSink(ContactsSink):
