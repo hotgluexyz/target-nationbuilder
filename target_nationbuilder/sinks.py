@@ -126,15 +126,22 @@ class ContactsSink(NationBuilderSink):
         """Process the record and handle empty field updates if configured."""
         payload = self.map_fields(record)
         person = payload.get("person", {})
-        
-        # Try to match the person by email if id is not provided
-        if not person.get("id") and person.get("email"):
-            matching_id = self.find_matching_object("email", person["email"])
-            if matching_id:
-                person["id"] = matching_id
-                payload["person"] = person
-        
         only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
+        
+        if not person.get("id") and person.get("email"):
+            matching_person = self.find_matching_object("email", person["email"])
+            if matching_person:
+                person["id"] = matching_person.get("id")
+                
+                if only_upsert_empty_fields:
+                    for key, value in person.items():
+                        if not matching_person.get(key):
+                            matching_person[key] = value
+                    return {"person": matching_person}
+                
+                payload["person"] = person
+                return payload
+        
         if only_upsert_empty_fields and person.get("id"):
             url = f"{self.base_url}{self.endpoint}/{person['id']}"
             headers = {
@@ -145,12 +152,11 @@ class ContactsSink(NationBuilderSink):
             self.validate_response(response)
             existing_record = response.json()
             
-            # Only update fields that are empty in the existing record
             if "person" in existing_record:
                 for key, value in person.items():
                     if not existing_record["person"].get(key):
                         existing_record["person"][key] = value
-                payload = existing_record
+                return existing_record
         
         return payload
 

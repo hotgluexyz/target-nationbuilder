@@ -216,7 +216,7 @@ class NationBuilderSink(HotglueSink):
             lookup_value: The value to search for
             
         Returns:
-            The ID of the matching object if found, None otherwise
+            The full matching object if found, None otherwise
         """
         if not lookup_value:
             return None
@@ -233,10 +233,7 @@ class NationBuilderSink(HotglueSink):
             if resp.status_code in [200, 201]:
                 match = resp.json()
                 if match.get(self.entity):
-                    return match[self.entity].get("id")
-                # For searches that return multiple results
-                if match.get("results") and len(match["results"]) > 0:
-                    return match["results"][0].get("id")
+                    return match[self.entity]
             return None
         except Exception:
             return None
