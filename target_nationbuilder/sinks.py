@@ -123,7 +123,26 @@ class ContactsSink(NationBuilderSink):
         return {"person": payload}  # return payload
 
     def preprocess_record(self, record: dict, context: dict) -> dict:
+        """Process the record and handle empty field updates if configured."""
         payload = self.map_fields(record)
+        person = payload.get("person", {})
+        only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
+        
+        matching_person = None
+        if person.get("id"):
+            matching_person = self.find_matching_object("id", person["id"])
+        elif person.get("email"):
+            matching_person = self.find_matching_object("email", person["email"])
+
+        if matching_person:
+            person["id"] = matching_person.get("id")
+                
+        if only_upsert_empty_fields:
+            for key, value in person.items():
+                if not matching_person.get(key):
+                    matching_person[key] = value
+            return {"person": matching_person}
+        
         return payload
 
 

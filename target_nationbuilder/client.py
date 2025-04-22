@@ -75,20 +75,7 @@ class NationBuilderSink(HotglueSink):
         id = payload.get("id")
         self.params["access_token"] = self.get_access_token()
         endpoint = self.endpoint
-        if not id:
-            try:
-                # check if there's a match with the same email
-                resp = self.request_api(
-                    "GET",
-                    request_data=record,
-                    endpoint=endpoint + f"/match?email={payload.get('email')}",
-                )
-                match = resp.json()
-                if match.get("person"):
-                    id = match["person"].get("id")
-            except:
-                pass
-
+        
         if id:
             method = "PUT"
             endpoint = f"{endpoint}/{id}"
@@ -220,3 +207,36 @@ class NationBuilderSink(HotglueSink):
             )
         except Exception as e:
             raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}. {e}")
+
+    def find_matching_object(self, lookup_field: str, lookup_value: str):
+        """Find a matching object by any lookup field.
+        
+        Args:
+            lookup_field: The field to search on (e.g., 'email', 'id', etc.)
+            lookup_value: The value to search for
+            
+        Returns:
+            The full matching object if found, None otherwise
+        """
+        if not lookup_value:
+            return None
+            
+        try:
+            if lookup_field == "id":
+                endpoint = f"{self.endpoint}/{lookup_value}"
+            else: 
+                endpoint = f"{self.endpoint}/match?{lookup_field}={lookup_value}"
+            
+            resp = self.request_api(
+                "GET",
+                endpoint=endpoint,
+                params={"access_token": self.get_access_token()}
+            )
+            
+            if resp.status_code in [200, 201]:
+                match = resp.json()
+                if match.get(self.entity):
+                    return match[self.entity]
+            return None
+        except Exception:
+            return None
