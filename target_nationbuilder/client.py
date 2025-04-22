@@ -75,20 +75,7 @@ class NationBuilderSink(HotglueSink):
         id = payload.get("id")
         self.params["access_token"] = self.get_access_token()
         endpoint = self.endpoint
-        if not id:
-            try:
-                # check if there's a match with the same email
-                resp = self.request_api(
-                    "GET",
-                    request_data=record,
-                    endpoint=endpoint + f"/match?email={payload.get('email')}",
-                )
-                match = resp.json()
-                if match.get("person"):
-                    id = match["person"].get("id")
-            except:
-                pass
-
+        
         if id:
             method = "PUT"
             endpoint = f"{endpoint}/{id}"
@@ -220,3 +207,31 @@ class NationBuilderSink(HotglueSink):
             )
         except Exception as e:
             raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}. {e}")
+
+    def lookup_by_email(self, email: str):
+        """Find a person by email address.
+        
+        Args:
+            email: The email to look up
+            
+        Returns:
+            The person ID if found, None otherwise
+        """
+        if not email:
+            return None
+            
+        try:
+            endpoint = f"{self.endpoint}/match?email={email}"
+            resp = self.request_api(
+                "GET",
+                endpoint=endpoint,
+                params={"access_token": self.get_access_token()}
+            )
+            
+            if resp.status_code in [200, 201]:
+                match = resp.json()
+                if match.get("person"):
+                    return match["person"].get("id")
+            return None
+        except Exception:
+            return None

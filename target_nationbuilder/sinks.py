@@ -53,10 +53,6 @@ class ContactsSink(NationBuilderSink):
     endpoint = "people"
     entity = "person"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
-
     def map_fields(self, record: dict) -> dict:
         payload = {
             "full_name": record.get("name"),
@@ -131,7 +127,15 @@ class ContactsSink(NationBuilderSink):
         payload = self.map_fields(record)
         person = payload.get("person", {})
         
-        if self.only_upsert_empty_fields and person.get("id"):
+        # Try to match the person by email if id is not provided
+        if not person.get("id") and person.get("email"):
+            matching_person = self.lookup_by_email(person["email"])
+            if matching_person:
+                person["id"] = matching_person
+                payload["person"] = person
+        
+        only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
+        if only_upsert_empty_fields and person.get("id"):
             url = f"{self.base_url}{self.endpoint}/{person['id']}"
             headers = {
                 "Authorization": f"Bearer {self.get_access_token()}",
