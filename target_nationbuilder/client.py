@@ -208,20 +208,22 @@ class NationBuilderSink(HotglueSink):
         except Exception as e:
             raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}. {e}")
 
-    def lookup_by_email(self, email: str):
-        """Find a person by email address.
+    def find_matching_object(self, lookup_field: str, lookup_value: str):
+        """Find a matching object by any lookup field.
         
         Args:
-            email: The email to look up
+            lookup_field: The field to search on (e.g., 'email', 'id', etc.)
+            lookup_value: The value to search for
             
         Returns:
-            The person ID if found, None otherwise
+            The ID of the matching object if found, None otherwise
         """
-        if not email:
+        if not lookup_value:
             return None
             
         try:
-            endpoint = f"{self.endpoint}/match?email={email}"
+            endpoint = f"{self.endpoint}/match?{lookup_field}={lookup_value}"
+                
             resp = self.request_api(
                 "GET",
                 endpoint=endpoint,
@@ -230,8 +232,11 @@ class NationBuilderSink(HotglueSink):
             
             if resp.status_code in [200, 201]:
                 match = resp.json()
-                if match.get("person"):
-                    return match["person"].get("id")
+                if match.get(self.entity):
+                    return match[self.entity].get("id")
+                # For searches that return multiple results
+                if match.get("results") and len(match["results"]) > 0:
+                    return match["results"][0].get("id")
             return None
         except Exception:
             return None

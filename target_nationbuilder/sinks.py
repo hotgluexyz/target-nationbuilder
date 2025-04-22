@@ -129,9 +129,9 @@ class ContactsSink(NationBuilderSink):
         
         # Try to match the person by email if id is not provided
         if not person.get("id") and person.get("email"):
-            matching_person = self.lookup_by_email(person["email"])
-            if matching_person:
-                person["id"] = matching_person
+            matching_id = self.find_matching_object("email", person["email"])
+            if matching_id:
+                person["id"] = matching_id
                 payload["person"] = person
         
         only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
