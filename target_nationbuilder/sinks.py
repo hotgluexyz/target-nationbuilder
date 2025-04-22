@@ -128,35 +128,20 @@ class ContactsSink(NationBuilderSink):
         person = payload.get("person", {})
         only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
         
-        if not person.get("id") and person.get("email"):
+        matching_person = None
+        if person.get("id"):
+            matching_person = self.find_matching_object("id", person["id"])
+        elif person.get("email"):
             matching_person = self.find_matching_object("email", person["email"])
-            if matching_person:
-                person["id"] = matching_person.get("id")
+
+        if matching_person:
+            person["id"] = matching_person.get("id")
                 
-                if only_upsert_empty_fields:
-                    for key, value in person.items():
-                        if not matching_person.get(key):
-                            matching_person[key] = value
-                    return {"person": matching_person}
-                
-                payload["person"] = person
-                return payload
-        
-        if only_upsert_empty_fields and person.get("id"):
-            url = f"{self.base_url}{self.endpoint}/{person['id']}"
-            headers = {
-                "Authorization": f"Bearer {self.get_access_token()}",
-                "Content-Type": "application/json",
-            }
-            response = requests.get(url, headers=headers)
-            self.validate_response(response)
-            existing_record = response.json()
-            
-            if "person" in existing_record:
-                for key, value in person.items():
-                    if not existing_record["person"].get(key):
-                        existing_record["person"][key] = value
-                return existing_record
+        if only_upsert_empty_fields:
+            for key, value in person.items():
+                if not matching_person.get(key):
+                    matching_person[key] = value
+            return {"person": matching_person}
         
         return payload
 

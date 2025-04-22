@@ -222,8 +222,11 @@ class NationBuilderSink(HotglueSink):
             return None
             
         try:
-            endpoint = f"{self.endpoint}/match?{lookup_field}={lookup_value}"
-                
+            if lookup_field == "id":
+                endpoint = f"{self.endpoint}/{lookup_value}"
+            else: 
+                endpoint = f"{self.endpoint}/match?{lookup_field}={lookup_value}"
+            
             resp = self.request_api(
                 "GET",
                 endpoint=endpoint,
