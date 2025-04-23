@@ -137,7 +137,7 @@ class ContactsSink(NationBuilderSink):
         if matching_person:
             person["id"] = matching_person.get("id")
                 
-        if only_upsert_empty_fields:
+        if only_upsert_empty_fields and matching_person:
             for key, value in person.items():
                 if not matching_person.get(key):
                     matching_person[key] = value
