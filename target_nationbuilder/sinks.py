@@ -141,6 +141,9 @@ class ContactsSink(NationBuilderSink):
             for key, value in person.items():
                 if not matching_person.get(key):
                     matching_person[key] = value
+            # we can't update a contact with nbec_precinct code empty, so if we have a matching as we use that as the base payload, we need to remove it if it's empty
+            if not matching_person.get("nbec_precinct", {}).get("code"):
+                matching_person.pop("nbec_precinct", None)
             return {"person": matching_person}
         
         return payload
