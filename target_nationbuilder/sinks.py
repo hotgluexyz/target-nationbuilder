@@ -139,11 +139,16 @@ class ContactsSink(NationBuilderSink):
                 
         if only_upsert_empty_fields and matching_person:
             for key, value in person.items():
-                if not matching_person.get(key):
+                if key == "tags":
+                    existing_tags = matching_person.get("tags") or []
+                    incoming_tags = value or []
+                    merged_tags = existing_tags + [t for t in incoming_tags if t not in existing_tags]
+                    matching_person["tags"] = merged_tags
+                elif not matching_person.get(key):
                     matching_person[key] = value
             return {"person": matching_person}
         
-        return payload
+        return {"person": person}
 
 
 class CustomersSink(ContactsSink):
