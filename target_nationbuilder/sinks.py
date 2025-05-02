@@ -136,13 +136,24 @@ class ContactsSink(NationBuilderSink):
 
         if matching_person:
             person["id"] = matching_person.get("id")
-                
-        if only_upsert_empty_fields and matching_person:
-            for key, value in person.items():
-                if not matching_person.get(key):
-                    matching_person[key] = value
-            return {"person": matching_person}
         
+        # get all the values in contact in matching_person
+        if matching_person:
+            # if the flag is on we only override the values that are null
+            if only_upsert_empty_fields:
+                # Only update null/empty values in matching_person with values from person
+                for key, value in person.items():
+                    if matching_person.get(key) is None:
+                        matching_person[key] = value
+            else:
+                # Update all values in matching_person with values from person
+                matching_person.update(person)
+
+            payload = {"person": matching_person}
+        
+        # Recursively clean null values from final payload
+        payload["person"] = self.clean_null_values(payload["person"])
+
         return payload
 
 

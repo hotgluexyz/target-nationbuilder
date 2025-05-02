@@ -240,3 +240,25 @@ class NationBuilderSink(HotglueSink):
             return None
         except Exception:
             return None
+
+    def clean_null_values(self, data):
+        """Recursively clean null values from a dictionary."""
+        if not isinstance(data, dict):
+            return data
+            
+        keys_to_remove = []
+        for key, value in data.items():
+            if value is None:
+                keys_to_remove.append(key)
+            elif isinstance(value, dict):
+                cleaned = self.clean_null_values(value)
+                if not cleaned:
+                    keys_to_remove.append(key)
+                else:
+                    data[key] = cleaned
+                    
+        for key in keys_to_remove:
+            data.pop(key)
+            
+        return data
+            
