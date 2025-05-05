@@ -196,5 +196,6 @@ class ContactsSink(NationBuilderSink):
         return {"person": person}
 
 
+
 class CustomersSink(ContactsSink):
     name = "Customers"
