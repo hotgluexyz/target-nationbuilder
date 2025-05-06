@@ -68,34 +68,6 @@ class NationBuilderSink(HotglueSink):
                 msg = self.response_error_message(response)
             raise FatalAPIError(msg)
 
-    def update_person_tags(self, person_id: int, desired_tags: list[str], current_tags: list[str]) -> None:
-        """
-        Sync a person's tags:
-        - Remove any tags in current_tags that aren’t in desired_tags
-        - Add any tags in desired_tags that aren’t already on the person
-        """
-        existing = set(current_tags)
-        incoming = set(desired_tags)
-
-        to_remove = list(existing - incoming)
-        to_add    = list(incoming - existing)
-
-        endpoint = f"people/{person_id}/taggings"
-        token    = self.get_access_token()
-        params   = {"access_token": token}
-
-        def call_api(method: str, tags: list[str]) -> None:
-            payload = {"tagging": {"tag": tags}}
-            try:
-                self.request_api(method, request_data=payload, endpoint=endpoint, params=params)
-            except Exception as e:
-                LOGGER.error(f"Failed to {method} tags {tags} for person {person_id}: {e}")
-
-        if to_remove:
-            call_api("DELETE", to_remove)
-        if to_add:
-            call_api("PUT", to_add)
-
     def upsert_record(self, record: dict, context: dict):
         method = "POST"
         state_dict = dict()
@@ -103,11 +75,6 @@ class NationBuilderSink(HotglueSink):
         id = payload.get("id")
         self.params["access_token"] = self.get_access_token()
         endpoint = self.endpoint
-        
-        # Extract tags before sending the request
-        incoming_tags = None
-        if "tags" in payload:
-            incoming_tags = payload.pop("tags")
         
         if id:
             method = "PUT"
@@ -118,11 +85,6 @@ class NationBuilderSink(HotglueSink):
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
             record["id"] = id
-            
-            # Handle tags separately using the taggings endpoint if they exist
-            if id and self.entity == "person":
-                existing_tags = response.json().get("person", {}).get("tags", [])
-                self.update_person_tags(id, incoming_tags, existing_tags)
                 
             if lists:
                 record["lists"] = lists

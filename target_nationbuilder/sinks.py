@@ -139,12 +139,8 @@ class ContactsSink(NationBuilderSink):
         
             if only_upsert_empty_fields :
                 for key, value in person.items():
-                    if key == "tags":
-                        existing_tags = matching_person.get("tags") or []
-                        incoming_tags = value or []
-                        merged_tags = existing_tags + [t for t in incoming_tags if t not in existing_tags]
-                        matching_person["tags"] = merged_tags
-                    elif matching_person.get(key) is None:
+                    # Nationbuilder API always appends tags on the Contact endpoint
+                    if matching_person.get(key) is None or key == "tags":
                         matching_person[key] = value
             else:
                 # Update all values in matching_person with values from person
