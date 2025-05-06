@@ -139,6 +139,7 @@ class ContactsSink(NationBuilderSink):
         
             if only_upsert_empty_fields :
                 for key, value in person.items():
+                    # Nationbuilder API always appends tags on the Contact endpoint
                     if matching_person.get(key) is None or key == "tags":
                         matching_person[key] = value
             else:
