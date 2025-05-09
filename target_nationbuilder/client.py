@@ -94,7 +94,7 @@ class NationBuilderSink(HotglueSink):
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
             record["id"] = id
-            
+
             if lists:
                 record["lists"] = lists
             self.resolve_contact_lists(record)

@@ -188,6 +188,7 @@ class ContactsSink(NationBuilderSink):
                     matching_person[key] = value
             return {"person": matching_person}
         
+        person = self.clean_null_values(person)
         return {"person": person}
 
 
