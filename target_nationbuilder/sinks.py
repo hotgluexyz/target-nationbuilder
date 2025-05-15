@@ -175,20 +175,23 @@ class ContactsSink(NationBuilderSink):
         
         lookup_fields = self.lookup_fields_dict.get("Contact", "email")
         matching_person = self.find_contact_with_lookup_fields(record, lookup_fields) or dict()
-
+        
         only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
-        
         if matching_person:
-            # without the id it will create a new contact
             person["id"] = matching_person.get("id")
-                
-        if only_upsert_empty_fields and matching_person:
-            for key, value in person.items():
-                if not matching_person.get(key):
-                    matching_person[key] = value
-            matching_person = self.clean_null_values(matching_person)
-            return {"person": matching_person}
         
+            if only_upsert_empty_fields:
+                for key, value in person.items():
+                    # Nationbuilder API always appends tags on the Contact endpoint
+                    if matching_person.get(key) is None or key == "tags":
+                        matching_person[key] = value
+            else:
+                # Update all values in matching_person with values from person
+                matching_person.update(person)
+        
+            person = matching_person
+        
+        # Recursively clean null values from final payload
         person = self.clean_null_values(person)
         return {"person": person}
 
