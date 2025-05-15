@@ -186,6 +186,7 @@ class ContactsSink(NationBuilderSink):
             for key, value in person.items():
                 if not matching_person.get(key):
                     matching_person[key] = value
+            matching_person = self.clean_null_values(matching_person)
             return {"person": matching_person}
         
         person = self.clean_null_values(person)
