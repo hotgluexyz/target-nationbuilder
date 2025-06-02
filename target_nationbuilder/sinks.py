@@ -65,23 +65,28 @@ class ContactsSink(NationBuilderSink):
         if isinstance(lookup_fields, str):
             if lookup_fields.lower() in fieldKeyMapping:
                 if not record.get(lookup_fields.lower()):
-                    raise Exception(f"Missing value for lookup field: {lookup_fields}")
-
+                    LOGGER.debug(f"Missing value for lookup field: {lookup_fields}")
+                    return None
                 return f"?{fieldKeyMapping[lookup_fields.lower()]}={record.get(lookup_fields.lower())}"
         elif isinstance(lookup_fields, list) and self.lookup_method == "all":
             suffix = "?"
+            has_valid_fields = False
             for field in lookup_fields:
                 if field.lower() in fieldKeyMapping:
                     if not record.get(field.lower()):
-                        raise Exception(f"Missing value for lookup field: {field}")
-
+                        LOGGER.debug(f"Missing value for lookup field: {field}")
+                        continue
+                    
                     suffix += f"{fieldKeyMapping[field.lower()]}={record.get(field.lower())}&"
-
+                    has_valid_fields = True
+            
+            if not has_valid_fields:
+                return None
             return suffix[:-1]
         
         raise ValueError("Invalid lookup field(s) provided")
 
-    def find_contact_with_lookup_fields(self, record: dict, lookup_fields: list[str]) -> dict:
+    def find_contact_with_lookup_fields(self, record: dict, lookup_fields) -> dict:
         LOGGER.info(f"Checking for contact with lookup field(s): {lookup_fields}")
 
         if isinstance(lookup_fields, list) and self.lookup_method == "sequential":

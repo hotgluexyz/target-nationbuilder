@@ -235,7 +235,7 @@ class NationBuilderSink(HotglueSink):
             if is_id:
                 endpoint = f"{self.endpoint}/{lookup_suffix}"
             else: 
-                endpoint = f"{self.endpoint}/match{lookup_suffix}"   #lookup_value already has the ?
+                endpoint = f"{self.endpoint}/match{lookup_suffix}"   #lookup_suffix already has the ?
             
             resp = self.request_api(
                 "GET",
@@ -248,7 +248,8 @@ class NationBuilderSink(HotglueSink):
                 if match.get(self.entity):
                     return match[self.entity]
             return None
-        except Exception:
+        except Exception as e:
+            LOGGER.error(f"Error finding contact by suffix: {e}")
             return None
 
     def clean_null_values(self, data):
