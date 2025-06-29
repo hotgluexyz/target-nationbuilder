@@ -13,11 +13,16 @@ import hashlib
 import time
 import unidecode
 import re
+from bs4 import BeautifulSoup
 
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 LOGGER = singer.get_logger()
 
+def extract_text_from_html(content: str) -> str:
+    soup = BeautifulSoup(content, 'html.parser')
+    text = '- '.join(soup.stripped_strings)
+    return text
 
 class NationBuilderSink(HotglueSink):
     def __init__(
@@ -58,6 +63,9 @@ class NationBuilderSink(HotglueSink):
         if response.status_code in [409]:
             msg = response.reason
             raise FatalAPIError(msg)
+        elif "cf-error-details" in response.text:
+            resp_text = extract_text_from_html(response.text)
+            raise FatalAPIError(resp_text)
         elif response.status_code in [429] or 500 <= response.status_code < 600:
             msg = self.response_error_message(response)
             raise RetriableAPIError(msg, response)
