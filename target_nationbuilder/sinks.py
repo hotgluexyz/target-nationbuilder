@@ -72,13 +72,11 @@ class ContactsSink(NationBuilderSink):
             address_type = None
             for i, address in enumerate(record["addresses"]):
                 if i == 0:
-                    address_type = "registered_address"
-                elif i == 1:
-                    address_type = "billing_address"
-                elif i == 2:
                     address_type = "home_address"
-                elif i == 3:
+                elif i == 1:
                     address_type = "work_address"
+                elif i == 2:
+                    address_type = "billing_address"
                 address_dict = {
                     "address1": address.get("line1"),
                     "address2": address.get("line2"),
