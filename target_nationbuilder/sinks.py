@@ -56,28 +56,24 @@ class ContactsSink(NationBuilderSink):
     entity = "person"
 
     def build_lookup_suffix(self, lookup_fields, record):
-        fieldKeyMapping = {
-            "first_name": 'first_name',
-            "last_name": 'last_name',
-            "email": 'email',
-        }
+        allowed_fields = {"first_name", "last_name", "email", "id"}
 
         if isinstance(lookup_fields, str):
-            if lookup_fields.lower() in fieldKeyMapping:
+            if lookup_fields.lower() in allowed_fields:
                 if not record.get(lookup_fields.lower()):
                     LOGGER.debug(f"Missing value for lookup field: {lookup_fields}")
                     return None
-                return f"?{fieldKeyMapping[lookup_fields.lower()]}={record.get(lookup_fields.lower())}"
-        elif isinstance(lookup_fields, list) and self.lookup_method == "all":
+                return f"?{lookup_fields.lower()}={record.get(lookup_fields.lower())}"
+        elif isinstance(lookup_fields, list):
             suffix = "?"
             has_valid_fields = False
             for field in lookup_fields:
-                if field.lower() in fieldKeyMapping:
+                if field.lower() in allowed_fields:
                     if not record.get(field.lower()):
                         LOGGER.debug(f"Missing value for lookup field: {field}")
                         continue
                     
-                    suffix += f"{fieldKeyMapping[field.lower()]}={record.get(field.lower())}&"
+                    suffix += f"{field.lower()}={record.get(field.lower())}&"
                     has_valid_fields = True
             
             if not has_valid_fields:
@@ -95,6 +91,33 @@ class ContactsSink(NationBuilderSink):
                 if matching_contact:
                     return matching_contact
             return None
+        
+        # Handle ID lookups specially
+        if isinstance(lookup_fields, str) and lookup_fields.lower() == "id":
+            id_value = record.get("id")
+            if id_value:
+                LOGGER.info(f"Looking up contact by ID: {id_value}")
+                matching_contact = self.find_contact_by_suffix(is_id=True, lookup_suffix=str(id_value))
+                if matching_contact:
+                    LOGGER.info(f"Found contact with id: {matching_contact.get('id')}")
+                    return matching_contact
+            return None
+        
+        # Handle list containing ID - prioritize ID lookup
+        if isinstance(lookup_fields, list) and any(field.lower() == "id" for field in lookup_fields):
+            id_value = record.get("id")
+            if id_value:
+                LOGGER.info(f"Looking up contact by ID from list: {id_value}")
+                matching_contact = self.find_contact_by_suffix(is_id=True, lookup_suffix=str(id_value))
+                if matching_contact:
+                    LOGGER.info(f"Found contact with id: {matching_contact.get('id')}")
+                    return matching_contact
+            # If ID lookup failed, fall back to other fields
+            non_id_fields = [field for field in lookup_fields if field.lower() != "id"]
+            if non_id_fields:
+                return self.find_contact_with_lookup_fields(record, non_id_fields)
+            return None
+        
         lookup_suffix = self.build_lookup_suffix(lookup_fields, record)
         LOGGER.info(f"Lookup suffix: {lookup_suffix}")
         matching_contact = self.find_contact_by_suffix(is_id=False, lookup_suffix=lookup_suffix)

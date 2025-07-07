@@ -45,7 +45,11 @@ class NationBuilderSink(HotglueSink):
     
     @property
     def lookup_method(self):
-        return self.config.get("lookup_method") or "all"
+        lookup_method = self.config.get("lookup_method") or "all"
+        # to handle both string and array formats
+        if isinstance(lookup_method, list) and len(lookup_method) > 0:
+            return lookup_method[0]
+        return lookup_method
     
     def get_country_codes(self):
         if not self.country_codes:
