@@ -23,7 +23,7 @@ class NationBuilderAuth(requests.auth.AuthBase):
                 },
             )
 
-            if response.status_code >= 400 and response.status_code < 500 and "invalid_grant" in response.text:
+            if 400 <= response.status_code < 500 and ("invalid_grant" in response.text or "invalid_client" in response.text):
                 try:
                     error_data = json.loads(response.text)
                     error_message = error_data["error_description"]
