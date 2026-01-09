@@ -1,8 +1,9 @@
 """Nationbuilder target class."""
 
-from singer_sdk import typing as th
-from singer_sdk.sinks import Sink
-from target_hotglue.target import TargetHotglue
+from hotglue_singer_sdk import typing as th
+from hotglue_singer_sdk.target_sdk.client import HotglueSink
+from hotglue_singer_sdk.target_sdk.target import TargetHotglue
+from hotglue_singer_sdk.helpers.capabilities import AlertingLevel
 from typing import Type
 
 from target_nationbuilder.sinks import (
@@ -19,6 +20,7 @@ class TargetNationbuilder(TargetHotglue):
         FallbackSink,
     ]
     name = "target-nationbuilder"
+    alerting_level = AlertingLevel.ERROR
 
     def __init__(
         self,
@@ -42,7 +44,7 @@ class TargetNationbuilder(TargetHotglue):
         th.Property("only_upsert_empty_fields", th.BooleanType, required=False),
     ).to_dict()
 
-    def get_sink_class(self, stream_name: str) -> Type[Sink]:
+    def get_sink_class(self, stream_name: str) -> Type[HotglueSink]:
         sink = super().get_sink_class(stream_name)
         return sink if sink else FallbackSink
 

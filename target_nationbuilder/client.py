@@ -1,13 +1,14 @@
-from target_hotglue.client import HotglueSink
+from hotglue_singer_sdk.target_sdk.client import HotglueSink
 import requests
-from singer_sdk.plugin_base import PluginBase
+from hotglue_singer_sdk.plugin_base import PluginBase
 from typing import Dict, List, Optional
 import singer
 import json
 import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
-from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+from hotglue_singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+from hotglue_etl_exceptions import InvalidPayloadError
 from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError, UnableToCheckUserNotOnContactListError, UnableToGetContactListsError
 import hashlib
 import time
@@ -74,6 +75,13 @@ class NationBuilderSink(HotglueSink):
                 msg = response.text
             except:
                 msg = self.response_error_message(response)
+            if response.status_code == 400 and "validation_failed" in msg:
+                try:
+                    error_data = json.loads(response.text)
+                    error_message = error_data["validation_errors"][0]
+                except:
+                    error_message = msg
+                raise InvalidPayloadError(error_message)
             raise FatalAPIError(msg)
 
     def upsert_record(self, record: dict, context: dict):
