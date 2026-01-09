@@ -1,6 +1,7 @@
 import requests
 import json
 from datetime import datetime, timedelta
+from hotglue_etl_exceptions import InvalidCredentialsError
 
 
 class NationBuilderAuth(requests.auth.AuthBase):
@@ -21,6 +22,14 @@ class NationBuilderAuth(requests.auth.AuthBase):
                     "grant_type": "refresh_token",
                 },
             )
+
+            if 400 <= response.status_code < 500 and ("invalid_grant" in response.text or "invalid_client" in response.text):
+                try:
+                    error_data = json.loads(response.text)
+                    error_message = error_data["error_description"]
+                except:
+                    error_message = response.text
+                raise InvalidCredentialsError(error_message)
 
             if response.status_code != 200:
                 raise Exception(response.text)
