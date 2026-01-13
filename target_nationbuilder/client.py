@@ -8,7 +8,7 @@ import os
 import requests
 from target_nationbuilder.auth import NationBuilderAuth
 from hotglue_singer_sdk.exceptions import FatalAPIError, RetriableAPIError
-from hotglue_etl_exceptions import InvalidPayloadError
+from hotglue_etl_exceptions import InvalidPayloadError, InvalidCredentialsError
 from target_nationbuilder.exceptions import UnableToCreateContactsListError, UnableToIncludePeopleIntoContactsListError, UnableToCheckUserNotOnContactListError, UnableToGetContactListsError
 import hashlib
 import time
@@ -82,6 +82,14 @@ class NationBuilderSink(HotglueSink):
                 except:
                     error_message = msg
                 raise InvalidPayloadError(error_message)
+            if response.status_code == 401 and "unauthorized" in msg:
+                try:
+                    error_data = json.loads(response.text)
+                    error_message = error_data["message"]
+                except:
+                    error_message = msg
+                raise InvalidCredentialsError(error_message)
+            
             raise FatalAPIError(msg)
 
     def upsert_record(self, record: dict, context: dict):
