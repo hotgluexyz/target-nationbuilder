@@ -59,13 +59,14 @@ class ContactsSink(NationBuilderSink):
             "first_name": record.get("first_name"),
             "last_name": record.get("last_name"),
             "email": record.get("email"),
-            "email_opt_in": True,  # disable if requested
             "profile_image_url_ssl": record.get("photo_url"),
             "note": record.get("description"),
-            "email_opt_in": record.get("subscribe_status") == "subscribed",
             "prefix": record.get("salutation"),
             "tags": record.get("tags")
         }
+
+        if record.get("subscribe_status") in ["subscribed", "unsubscribed"]:
+            payload["email_opt_in"] = record["subscribe_status"] == "subscribed"
 
         # map addresses
         if "addresses" in record and isinstance(record["addresses"], list):
