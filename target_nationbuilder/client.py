@@ -62,6 +62,8 @@ class NationBuilderSink(HotglueSink):
             raise FatalAPIError(msg)
         elif "cf-error-details" in response.text:
             resp_text = extract_text_from_html(response.text)
+            if response.status_code == 429:
+                raise RetriableAPIError(resp_text, response)
             raise FatalAPIError(resp_text)
         elif response.status_code in [429] or 500 <= response.status_code < 600:
             msg = self.response_error_message(response)
