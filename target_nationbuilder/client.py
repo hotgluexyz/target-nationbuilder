@@ -14,16 +14,12 @@ import hashlib
 import time
 import unidecode
 import re
-from bs4 import BeautifulSoup
+from target_nationbuilder.utils import extract_text_from_html
 
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 LOGGER = singer.get_logger()
 
-def extract_text_from_html(content: str) -> str:
-    soup = BeautifulSoup(content, 'html.parser')
-    text = '- '.join(soup.stripped_strings)
-    return text
 
 class NationBuilderSink(HotglueSink):
     def __init__(
