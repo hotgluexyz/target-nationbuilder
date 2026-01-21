@@ -2,6 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from hotglue_etl_exceptions import InvalidCredentialsError
+from target_nationbuilder.utils import extract_text_from_html
 
 
 class NationBuilderAuth(requests.auth.AuthBase):
@@ -10,8 +11,12 @@ class NationBuilderAuth(requests.auth.AuthBase):
         self.__session = requests.Session()
         self.__access_token = None
         self.__expires_at = None
+        self.__credentials_error = None
 
     def ensure_access_token(self):
+        if self.__credentials_error is not None:
+            raise InvalidCredentialsError(self.__credentials_error)
+
         if self.__access_token is None or self.__expires_at <= datetime.utcnow():
             response = self.__session.post(
                 f"https://{self._target._config.get('subdomain')}.nationbuilder.com/oauth/token",
@@ -29,10 +34,14 @@ class NationBuilderAuth(requests.auth.AuthBase):
                     error_message = error_data["error_description"]
                 except:
                     error_message = response.text
+                self.__credentials_error = error_message
                 raise InvalidCredentialsError(error_message)
 
             if response.status_code != 200:
-                raise Exception(response.text)
+                error_message = response.text
+                if "cf-error-details" in error_message:
+                    error_message = extract_text_from_html(error_message)
+                raise Exception(error_message)
 
             data = response.json()
 
