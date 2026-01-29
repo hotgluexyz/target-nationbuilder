@@ -2,7 +2,9 @@
 
 from target_nationbuilder.client import NationBuilderSink
 import requests
+import singer
 
+LOGGER = singer.get_logger()
 
 class FallbackSink(NationBuilderSink):
     """Fallback sink for non-idempotent endpoints that passes through the record directly."""
@@ -52,6 +54,78 @@ class ContactsSink(NationBuilderSink):
     name = "Contacts"
     endpoint = "people"
     entity = "person"
+
+    def build_lookup_suffix(self, lookup_fields, record):
+        allowed_fields = {"first_name", "last_name", "email", "id"}
+
+        if isinstance(lookup_fields, str):
+            if lookup_fields.lower() in allowed_fields:
+                if not record.get(lookup_fields.lower()):
+                    LOGGER.debug(f"Missing value for lookup field: {lookup_fields}")
+                    return None
+                return f"?{lookup_fields.lower()}={record.get(lookup_fields.lower())}"
+        elif isinstance(lookup_fields, list):
+            suffix = "?"
+            has_valid_fields = False
+            for field in lookup_fields:
+                if field.lower() in allowed_fields:
+                    if not record.get(field.lower()):
+                        LOGGER.debug(f"Missing value for lookup field: {field}")
+                        continue
+                    
+                    suffix += f"{field.lower()}={record.get(field.lower())}&"
+                    has_valid_fields = True
+            
+            if not has_valid_fields:
+                return None
+            return suffix[:-1]
+        
+        raise ValueError("Invalid lookup field(s) provided")
+
+    def find_contact_with_lookup_fields(self, record: dict, lookup_fields) -> dict:
+        LOGGER.info(f"Checking for contact with lookup field(s): {lookup_fields}")
+
+        if isinstance(lookup_fields, list) and self.lookup_method == "sequential":
+            for field in lookup_fields:
+                matching_contact = self.find_contact_with_lookup_fields(record, field)
+                if matching_contact:
+                    return matching_contact
+            return None
+        
+        # Handle ID lookups specially
+        if isinstance(lookup_fields, str) and lookup_fields.lower() == "id":
+            id_value = record.get("id")
+            if id_value:
+                LOGGER.info(f"Looking up contact by ID: {id_value}")
+                matching_contact = self.find_contact_by_suffix(is_id=True, lookup_suffix=str(id_value))
+                if matching_contact:
+                    LOGGER.info(f"Found contact with id: {matching_contact.get('id')}")
+                    return matching_contact
+            return None
+        
+        # Handle list containing ID - prioritize ID lookup
+        if isinstance(lookup_fields, list) and any(field.lower() == "id" for field in lookup_fields):
+            id_value = record.get("id")
+            if id_value:
+                LOGGER.info(f"Looking up contact by ID from list: {id_value}")
+                matching_contact = self.find_contact_by_suffix(is_id=True, lookup_suffix=str(id_value))
+                if matching_contact:
+                    LOGGER.info(f"Found contact with id: {matching_contact.get('id')}")
+                    return matching_contact
+            # If ID lookup failed, fall back to other fields
+            non_id_fields = [field for field in lookup_fields if field.lower() != "id"]
+            if non_id_fields:
+                return self.find_contact_with_lookup_fields(record, non_id_fields)
+            return None
+        
+        lookup_suffix = self.build_lookup_suffix(lookup_fields, record)
+        LOGGER.info(f"Lookup suffix: {lookup_suffix}")
+        matching_contact = self.find_contact_by_suffix(is_id=False, lookup_suffix=lookup_suffix)
+        if matching_contact:
+            LOGGER.info(f"Found contact with id: {matching_contact.get('id')}")
+            return matching_contact
+        return None
+
 
     def map_fields(self, record: dict) -> dict:
         payload = {
@@ -125,18 +199,15 @@ class ContactsSink(NationBuilderSink):
         """Process the record and handle empty field updates if configured."""
         payload = self.map_fields(record)
         person = payload.get("person", {})
-        only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
         
-        matching_person = None
-        if person.get("id"):
-            matching_person = self.find_matching_object("id", person["id"])
-        elif person.get("email"):
-            matching_person = self.find_matching_object("email", person["email"])
-
+        lookup_fields = self.lookup_fields_dict.get("Contact", "email")
+        matching_person = self.find_contact_with_lookup_fields(record, lookup_fields) or dict()
+        
+        only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
         if matching_person:
             person["id"] = matching_person.get("id")
         
-            if only_upsert_empty_fields :
+            if only_upsert_empty_fields:
                 for key, value in person.items():
                     # Nationbuilder API always appends tags on the Contact endpoint
                     if matching_person.get(key) is None or key == "tags":
