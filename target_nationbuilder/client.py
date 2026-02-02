@@ -59,7 +59,7 @@ class NationBuilderSink(HotglueSink):
         """Validate HTTP response."""
         if response.status_code in [409]:
             msg = response.reason
-            raise FatalAPIError(msg)
+            raise InvalidPayloadError("Conflict error: " + msg)
         elif "cf-error-details" in response.text:
             resp_text = extract_text_from_html(response.text)
             if response.status_code == 429:
