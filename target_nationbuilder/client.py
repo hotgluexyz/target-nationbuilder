@@ -5,7 +5,6 @@ from typing import Dict, List, Optional
 import singer
 import json
 import os
-import requests
 from target_nationbuilder.auth import NationBuilderAuth
 from hotglue_singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 from hotglue_etl_exceptions import InvalidPayloadError, InvalidCredentialsError
@@ -139,7 +138,7 @@ class NationBuilderSink(HotglueSink):
             endpoint = "lists"
             next_page = ""
             contact_lists = {}
-            while next_page != None:
+            while next_page is not None:
                 resp = self.request_api(
                     method,
                     endpoint=endpoint + next_page,
@@ -193,7 +192,7 @@ class NationBuilderSink(HotglueSink):
             if response.status_code in [200, 201]:
                 state_dict["success"] = True
                 return response.json().get("list_resource", {}).get("id")
-        except Exception as e:
+        except Exception:
             raise UnableToCreateContactsListError(f"Unable to create contacts list {contact_list_name} with author if {author_id}")
         
     def check_user_not_on_contact_list(self, contact_list_id: int, people_id: int) -> bool:
