@@ -40,6 +40,18 @@ class NationBuilderSink(HotglueSink):
     def base_url(self):
         return f"https://{self.config.get('subdomain')}.nationbuilder.com/api/v1/"
 
+    @property
+    def lookup_fields_dict(self):
+        return self.config.get("lookup_fields") or {}
+    
+    @property
+    def lookup_method(self):
+        lookup_method = self.config.get("lookup_method") or "all"
+        # to handle both string and array formats
+        if isinstance(lookup_method, list) and len(lookup_method) > 0:
+            return lookup_method[0]
+        return lookup_method
+    
     def get_country_codes(self):
         if not self.country_codes:
             with open(os.path.join(__location__, "country_codes.json"), "r") as file:
@@ -89,6 +101,7 @@ class NationBuilderSink(HotglueSink):
             
             raise FatalAPIError(msg)
 
+
     def upsert_record(self, record: dict, context: dict):
         method = "POST"
         state_dict = dict()
@@ -106,7 +119,7 @@ class NationBuilderSink(HotglueSink):
             state_dict["success"] = True
             id = response.json().get(self.entity, {}).get("id")
             record["id"] = id
-                
+
             if lists:
                 record["lists"] = lists
             self.resolve_contact_lists(record)
@@ -230,24 +243,24 @@ class NationBuilderSink(HotglueSink):
         except Exception as e:
             raise UnableToIncludePeopleIntoContactsListError(f"Unable to include {people_id} into contact list {contact_list_id}. {e}")
 
-    def find_matching_object(self, lookup_field: str, lookup_value: str):
-        """Find a matching object by any lookup field.
+    def find_contact_by_suffix(self, is_id: bool, lookup_suffix: str):
+        """Find a matching object by id or other fields (email, first_name, last_name, etc.)
         
         Args:
-            lookup_field: The field to search on (e.g., 'email', 'id', etc.)
+            is_id: Whether the lookup value is an id
             lookup_value: The value to search for
             
         Returns:
             The full matching object if found, None otherwise
         """
-        if not lookup_value:
+        if not lookup_suffix:
             return None
             
         try:
-            if lookup_field == "id":
-                endpoint = f"{self.endpoint}/{lookup_value}"
+            if is_id:
+                endpoint = f"{self.endpoint}/{lookup_suffix}"
             else: 
-                endpoint = f"{self.endpoint}/match?{lookup_field}={lookup_value}"
+                endpoint = f"{self.endpoint}/match{lookup_suffix}"   #lookup_suffix already has the ?
             
             resp = self.request_api(
                 "GET",
@@ -260,7 +273,8 @@ class NationBuilderSink(HotglueSink):
                 if match.get(self.entity):
                     return match[self.entity]
             return None
-        except Exception:
+        except Exception as e:
+            LOGGER.error(f"Error finding contact by suffix: {e}")
             return None
 
     def clean_null_values(self, data):
