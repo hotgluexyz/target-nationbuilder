@@ -54,6 +54,10 @@ class NationBuilderSink(HotglueSink):
     def get_country_code(self, country_name):
         return self.get_country_codes().get(country_name)
 
+    def backoff_max_tries(self) -> int:
+        """Increase retries when RetriableAPIError is raised (default is 5)."""
+        return 10
+
     def validate_response(self, response: requests.Response) -> None:
         """Validate HTTP response."""
         if response.status_code in [409]:
