@@ -38,6 +38,7 @@ class NationBuilderAuth(requests.auth.AuthBase):
                 raise InvalidCredentialsError(error_message)
             
             if response.status_code == 404 and "The URL you requested either moved or no longer exists" in response.text:
+                self.__credentials_error = "Invalid Nationbuilder subdomain: " + self._target._config.get('subdomain')
                 raise InvalidCredentialsError("Invalid Nationbuilder subdomain: " + self._target._config.get('subdomain'))
 
             if response.status_code != 200:
